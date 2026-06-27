@@ -84,7 +84,6 @@ function ShippingMethods() {
             <Table variant="simple">
               <Thead>
                 <Tr>
-                  <Th>ID</Th>
                   <Th>Название</Th>
                   <Th>Статус</Th>
                   <Th>Действия</Th>
@@ -93,7 +92,6 @@ function ShippingMethods() {
               <Tbody>
                 {methods.map(m => (
                   <Tr key={m.id}>
-                    <Td>{m.id}</Td>
                     <Td>{m.name}</Td>
                     <Td>
                       <Badge colorScheme={m.is_active ? 'green' : 'gray'}>

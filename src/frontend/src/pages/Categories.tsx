@@ -4,7 +4,7 @@ import {
   Card, CardBody, Flex, Spinner, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, IconButton, useDisclosure, FormLabel
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiFolder } from 'react-icons/fi';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../api';
 import SortableTable from '../components/SortableTable';
 import type { ColumnConfig } from '../components/SortableTable';
@@ -137,7 +137,7 @@ function Categories() {
   };
 
   const columns: ColumnConfig[] = [
-    { key: 'id', label: 'ID', width: '60px' },
+    { key: '_icon', label: '', width: '30px', sortable: false, filterable: false, render: () => <FiFolder size={16} /> },
     {
       key: 'name', label: 'Название', filterType: 'text',
       render: (val: string, row: CategoryRow) => (

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Button, Text, Input as ChakraInput, Select as ChakraSelect,
   Card, CardBody, Flex, Spinner, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, IconButton, Badge, useDisclosure, FormLabel,
   Table, Thead, Tbody, Tr, Th, Td
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiExternalLink, FiSearch, FiX } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiExternalLink, FiSearch, FiX, FiLayers } from 'react-icons/fi';
 import {
   getMaterials, createMaterial, updateMaterial, deleteMaterial, getUnitTypes,
   getMaterialBatches, addMaterialBatch
@@ -47,11 +47,28 @@ function Materials() {
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
-  const [parentCat, setParentCat] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [catPath, setCatPath] = useState<number[]>([]);
 
-  const parentCategories = categories.filter(c => c.parent_id === null);
-  const childCategories = categories.filter(c => String(c.parent_id) === parentCat);
+  const catLevels = useMemo(() => {
+    const levels: { parentId: number | null; options: Category[]; selected: number | undefined }[] = [];
+    levels.push({
+      parentId: null,
+      options: categories.filter(c => c.parent_id === null),
+      selected: catPath[0],
+    });
+    for (let i = 0; i < catPath.length; i++) {
+      const children = categories.filter(c => c.parent_id === catPath[i]);
+      if (children.length === 0) break;
+      levels.push({
+        parentId: catPath[i],
+        options: children,
+        selected: catPath[i + 1],
+      });
+    }
+    return levels;
+  }, [categories, catPath]);
+
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [formData, setFormData] = useState({
     name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common'
@@ -100,19 +117,24 @@ function Materials() {
         article: material.article || '', min_stock: String(material.min_stock || ''),
         material_type: material.material_type || 'common'
       });
-      const cat = categories.find(c => c.id === material.category_id);
-      if (cat && cat.parent_id) {
-        setParentCat(String(cat.parent_id));
-      } else if (cat) {
-        setParentCat(String(cat.id));
-        setFormData(prev => ({ ...prev, category_id: '' }));
-      } else {
-        setParentCat('');
+      const path: number[] = [];
+      if (material.category_id) {
+        const cat = categories.find(c => c.id === material.category_id);
+        if (cat) {
+          path.unshift(cat.id);
+          let parentId: number | null | undefined = cat.parent_id;
+          while (parentId) {
+            path.unshift(parentId);
+            const parent = categories.find(c => c.id === parentId);
+            parentId = parent?.parent_id;
+          }
+        }
       }
+      setCatPath(path);
     } else {
       setEditingMaterial(null);
       setFormData({ name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common' });
-      setParentCat('');
+      setCatPath([]);
     }
     onOpen();
   };
@@ -121,9 +143,7 @@ function Materials() {
 
   const handleSubmit = async () => {
     try {
-      const catId = formData.category_id
-        ? Number(formData.category_id)
-        : (parentCat ? Number(parentCat) : null);
+      const catId = catPath.length > 0 ? catPath[catPath.length - 1] : null;
       const data = {
         ...formData,
         category_id: catId,
@@ -161,7 +181,7 @@ function Materials() {
   const batchCostPerUnit = batchQuantity && batchTotalCost ? (Number(batchTotalCost) / Number(batchQuantity)).toFixed(2) : '0';
 
   const columns: ColumnConfig[] = [
-    { key: 'id', label: 'ID', width: '60px', filterType: 'text' },
+    { key: '_icon', label: '', width: '30px', sortable: false, filterable: false, render: () => <FiLayers size={16} /> },
     { key: 'name', label: 'Название', filterType: 'text', render: (val: string, row: Material) => (
       <Flex align="center" gap={2}>
         {val}
@@ -224,8 +244,22 @@ function Materials() {
           <ModalBody pb={6}>
             <Box display="flex" flexDirection="column" gap={4}>
               <Box><FormLabel>Название</FormLabel><ChakraInput placeholder="Введите название" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></Box>
-              <Box><FormLabel>Группа категории</FormLabel><ChakraSelect placeholder="Выберите группу" value={parentCat} onChange={e => { setParentCat(e.target.value); setFormData({ ...formData, category_id: '' }); }}>{parentCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</ChakraSelect></Box>
-              <Box><FormLabel>Подкатегория</FormLabel><ChakraSelect placeholder={parentCat ? 'Выберите подкатегорию' : 'Сначала выберите группу'} value={formData.category_id} onChange={e => setFormData({ ...formData, category_id: e.target.value })} isDisabled={!parentCat}>{childCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</ChakraSelect></Box>
+              {catLevels.map((level, idx) => (
+                <Box key={idx}>
+                  <FormLabel>{idx === 0 ? 'Группа категории' : `Подкатегория ${idx}`}</FormLabel>
+                  <ChakraSelect
+                    placeholder={idx < catPath.length ? 'Выберите...' : 'Сначала выберите выше'}
+                    value={level.selected ?? ''}
+                    onChange={e => {
+                      const trimmed = catPath.slice(0, idx);
+                      if (e.target.value) trimmed.push(Number(e.target.value));
+                      setCatPath(trimmed);
+                    }}
+                  >
+                    {level.options.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </ChakraSelect>
+                </Box>
+              ))}
               <Box><FormLabel>Тип материала</FormLabel><ChakraSelect value={formData.material_type} onChange={e => setFormData({ ...formData, material_type: e.target.value })}><option value="common">Обычный материал</option><option value="equipment_supply">Расходник оборудования</option></ChakraSelect></Box>
               <Box><FormLabel>Единица измерения</FormLabel><ChakraSelect placeholder="Выберите единицу измерения" value={formData.unit_id} onChange={e => setFormData({ ...formData, unit_id: e.target.value })}>{unitTypes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</ChakraSelect></Box>
               <Box><FormLabel>Ссылка на сайт</FormLabel><ChakraInput placeholder="https://..." value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} /></Box>

@@ -5,7 +5,7 @@ import {
   ModalHeader, ModalBody, ModalCloseButton, IconButton, Badge, useDisclosure, FormLabel, Tabs, TabList, TabPanels, Tab, TabPanel,
   Table, Thead, Tbody, Tr, Th, Td
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiList, FiTool, FiPrinter } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiList, FiTool, FiPrinter, FiBox } from 'react-icons/fi';
 import {
   getProducts, createProduct, updateProduct, deleteProduct,
   getMaterials, getEquipment, getProductSpecification,
@@ -122,7 +122,7 @@ function Products() {
   };
 
   const columns: ColumnConfig[] = [
-    { key: 'id', label: 'ID', width: '60px', filterType: 'text' },
+    { key: '_icon', label: '', width: '30px', sortable: false, filterable: false, render: () => <FiBox size={16} /> },
     { key: 'name', label: 'Название', filterType: 'text' },
     { key: 'sale_price', label: 'Цена продажи', filterType: 'text', render: (val: number | null) => val ? <Badge colorScheme="blue">{val.toFixed(2)} ₽</Badge> : <Text color="gray.400">-</Text> },
     { key: 'cost_display', label: 'Себестоимость', filterType: 'text', render: (_: any, row: Product) => (

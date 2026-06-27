@@ -137,9 +137,9 @@ function Reports() {
 
       <Card><CardHeader><Text fontWeight="semibold">Все остатки</Text></CardHeader><CardBody>
         <Table variant="simple">
-          <Thead><Tr><Th>ID</Th><Th>Название</Th><Th>Остаток</Th><Th>Минимум</Th><Th>Ед. изм.</Th><Th>Статус</Th></Tr></Thead>
+          <Thead><Tr><Th>Название</Th><Th>Остаток</Th><Th>Минимум</Th><Th>Ед. изм.</Th><Th>Статус</Th></Tr></Thead>
           <Tbody>{stocks.map(m => (
-            <Tr key={m.id}><Td>{m.id}</Td><Td>{m.name}</Td><Td>{m.current_stock}</Td><Td>{m.min_stock || '-'}</Td><Td>{m.unit || '-'}</Td>
+            <Tr key={m.id}><Td>{m.name}</Td><Td>{m.current_stock}</Td><Td>{m.min_stock || '-'}</Td><Td>{m.unit || '-'}</Td>
               <Td>{m.min_stock !== null && m.current_stock < m.min_stock ? '🔴 Низкий' : '🟢 В норме'}</Td>
             </Tr>
           ))}</Tbody>

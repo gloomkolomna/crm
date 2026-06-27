@@ -5,7 +5,7 @@ import {
   ModalHeader, ModalBody, ModalCloseButton, IconButton, Badge, Checkbox,
   useDisclosure, FormLabel, Tabs, TabList, TabPanels, Tab, TabPanel, Grid
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiTrendingUp, FiList, FiCheck, FiTruck, FiPackage } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiTrendingUp, FiList, FiCheck, FiTruck, FiPackage, FiShoppingCart } from 'react-icons/fi';
 import {
   getOrders, createOrder, updateOrder, deleteOrder,
   getOrderItems, addOrderItem, deleteOrderItem,
@@ -223,7 +223,7 @@ function Sales() {
   };
 
   const columns: ColumnConfig[] = [
-    { key: 'id', label: 'ID', width: '60px', filterType: 'text' },
+    { key: '_icon', label: '', width: '30px', sortable: false, filterable: false, render: () => <FiShoppingCart size={16} /> },
     { key: 'customer_name', label: 'Клиент', filterType: 'text' },
     { key: 'order_date', label: 'Дата', filterType: 'text' },
     { key: 'total_amount', label: 'Сумма', filterType: 'text', render: (val: number) => <Badge colorScheme="green">{val.toFixed(2)} ₽</Badge> },

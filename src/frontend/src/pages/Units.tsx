@@ -4,7 +4,7 @@ import {
   Card, CardBody, Flex, Spinner, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, IconButton, useDisclosure, FormLabel
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiHash } from 'react-icons/fi';
 import { getUnits, createUnit, updateUnit, deleteUnit } from '../api';
 import SortableTable from '../components/SortableTable';
 import type { ColumnConfig } from '../components/SortableTable';
@@ -47,7 +47,7 @@ function Units() {
   };
 
   const columns: ColumnConfig[] = [
-    { key: 'id', label: 'ID', width: '60px', filterType: 'text' },
+    { key: '_icon', label: '', width: '30px', sortable: false, filterable: false, render: () => <FiHash size={16} /> },
     { key: 'name', label: 'Название', filterType: 'text' },
     { key: '_actions', label: 'Действия', sortable: false, filterable: false, render: (_: any, row: Unit) => (
       <Flex gap={1}>

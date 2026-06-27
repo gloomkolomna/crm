@@ -4,7 +4,7 @@ import {
   Card, CardBody, Flex, Spinner, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, IconButton, Badge, useDisclosure, FormLabel, Progress, Alert, AlertIcon
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiRefreshCw } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiMonitor } from 'react-icons/fi';
 import {
   getEquipment, createEquipment, updateEquipment, deleteEquipment,
   getMaterials, addEquipmentSpecification, removeEquipmentSpecification,
@@ -161,7 +161,7 @@ function Equipment() {
 
   // Конфигурация колонок для SortableTable
   const columns: ColumnConfig[] = [
-    { key: 'id', label: 'ID', width: '60px', filterType: 'text' },
+    { key: '_icon', label: '', width: '30px', sortable: false, filterable: false, render: () => <FiMonitor size={16} /> },
     { key: 'name', label: 'Название', filterType: 'text' },
     { key: 'cost', label: 'Стоимость', filterType: 'text', render: (val: number) => `${val} ₽` },
     { key: 'spec_summary', label: 'Расходники', filterable: false, render: (_: any, row: EquipmentItem) => (
