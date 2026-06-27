@@ -1,0 +1,28 @@
+# Аналитика
+Аналитика/
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.pytest_cache/
+
+# Build
+dist/
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+.opencode/
+.swarm/
+.kilo/
+graphify-out/
