@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   Table, Thead, Tbody, Tr, Th, Td, Box, IconButton, Text,
   Menu, MenuButton, MenuList, MenuItem, MenuDivider,
-  Checkbox, Input as ChakraInput, HStack, Badge, Flex
+  Input as ChakraInput, HStack, Badge, Flex
 } from '@chakra-ui/react';
 import { FiFilter, FiArrowUp, FiArrowDown, FiX } from 'react-icons/fi';
 
