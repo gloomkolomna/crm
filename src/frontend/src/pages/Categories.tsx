@@ -5,14 +5,48 @@ import {
   ModalHeader, ModalBody, ModalCloseButton, IconButton, useDisclosure, FormLabel
 } from '@chakra-ui/react';
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
-import { getCategories, createCategory, deleteCategory } from '../api';
+import { getCategories, createCategory, updateCategory, deleteCategory } from '../api';
 
 interface Category { id: number; name: string; parent_id: number | null; }
+
+function buildCategoryTree(
+  categories: Category[], excludeId?: number | null
+): { id: number; label: string }[] {
+  const map = new Map<number, Category & { children: Category[] }>();
+  const roots: (Category & { children: Category[] })[] = [];
+  const result: { id: number; label: string }[] = [];
+
+  for (const cat of categories) {
+    map.set(cat.id, { ...cat, children: [] });
+  }
+  for (const cat of categories) {
+    if (cat.parent_id && map.has(cat.parent_id)) {
+      map.get(cat.parent_id)!.children.push(map.get(cat.id)!);
+    } else {
+      roots.push(map.get(cat.id)!);
+    }
+  }
+
+  function walk(nodes: (Category & { children: Category[] })[], prefix: string) {
+    for (const node of nodes) {
+      if (node.id !== excludeId) {
+        result.push({ id: node.id, label: prefix + node.name });
+        if (node.children.length > 0) {
+          walk(node.children, prefix + '→ ');
+        }
+      }
+    }
+  }
+
+  walk(roots, '');
+  return result;
+}
 
 function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({ name: '', parent_id: '' });
 
   useEffect(() => { fetchCategories(); }, []);
@@ -24,17 +58,31 @@ function Categories() {
   };
 
   const handleOpen = (category?: Category) => {
-    if (category) { setFormData({ name: category.name, parent_id: String(category.parent_id || '') }); }
-    else { setFormData({ name: '', parent_id: '' }); }
+    if (category) {
+      setEditingCategory(category);
+      setFormData({ name: category.name, parent_id: String(category.parent_id || '') });
+    } else {
+      setEditingCategory(null);
+      setFormData({ name: '', parent_id: '' });
+    }
     onOpen();
   };
 
-  const handleClose = () => { onClose(); setFormData({ name: '', parent_id: '' }); };
+  const handleClose = () => {
+    onClose();
+    setEditingCategory(null);
+    setFormData({ name: '', parent_id: '' });
+  };
 
   const handleSubmit = async () => {
     try {
       const data = { name: formData.name, parent_id: formData.parent_id ? Number(formData.parent_id) : null };
-      await createCategory(data); fetchCategories(); handleClose();
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, data);
+      } else {
+        await createCategory(data);
+      }
+      fetchCategories(); handleClose();
     } catch (e) { console.error(e); }
   };
 
@@ -73,7 +121,9 @@ function Categories() {
             <Box><FormLabel>Название</FormLabel><ChakraInput placeholder="Введите название" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></Box>
             <Box><FormLabel>Родительская категория</FormLabel>
               <ChakraSelect placeholder="Без родительской категории" value={formData.parent_id} onChange={e => setFormData({ ...formData, parent_id: e.target.value })}>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {buildCategoryTree(categories, editingCategory?.id).map(c => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
               </ChakraSelect>
             </Box>
             <Button colorScheme="blue" onClick={handleSubmit}>Сохранить</Button>

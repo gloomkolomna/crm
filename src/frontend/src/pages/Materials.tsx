@@ -29,7 +29,7 @@ interface Material {
   material_type: 'common' | 'equipment_supply';
 }
 
-interface Category { id: number; name: string; }
+interface Category { id: number; name: string; parent_id: number | null; }
 interface UnitType { id: number; name: string; }
 interface Batch {
   id: number;
@@ -47,7 +47,11 @@ function Materials() {
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
+  const [parentCat, setParentCat] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const parentCategories = categories.filter(c => c.parent_id === null);
+  const childCategories = categories.filter(c => String(c.parent_id) === parentCat);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [formData, setFormData] = useState({
     name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common'
@@ -96,9 +100,19 @@ function Materials() {
         article: material.article || '', min_stock: String(material.min_stock || ''),
         material_type: material.material_type || 'common'
       });
+      const cat = categories.find(c => c.id === material.category_id);
+      if (cat && cat.parent_id) {
+        setParentCat(String(cat.parent_id));
+      } else if (cat) {
+        setParentCat(String(cat.id));
+        setFormData(prev => ({ ...prev, category_id: '' }));
+      } else {
+        setParentCat('');
+      }
     } else {
       setEditingMaterial(null);
       setFormData({ name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common' });
+      setParentCat('');
     }
     onOpen();
   };
@@ -107,9 +121,12 @@ function Materials() {
 
   const handleSubmit = async () => {
     try {
+      const catId = formData.category_id
+        ? Number(formData.category_id)
+        : (parentCat ? Number(parentCat) : null);
       const data = {
         ...formData,
-        category_id: formData.category_id ? Number(formData.category_id) : null,
+        category_id: catId,
         unit_id: Number(formData.unit_id),
         min_stock: formData.min_stock ? Number(formData.min_stock) : null,
         material_type: formData.material_type,
@@ -207,7 +224,8 @@ function Materials() {
           <ModalBody pb={6}>
             <Box display="flex" flexDirection="column" gap={4}>
               <Box><FormLabel>Название</FormLabel><ChakraInput placeholder="Введите название" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></Box>
-              <Box><FormLabel>Категория</FormLabel><ChakraSelect placeholder="Выберите категорию" value={formData.category_id} onChange={e => setFormData({ ...formData, category_id: e.target.value })}>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</ChakraSelect></Box>
+              <Box><FormLabel>Группа категории</FormLabel><ChakraSelect placeholder="Выберите группу" value={parentCat} onChange={e => { setParentCat(e.target.value); setFormData({ ...formData, category_id: '' }); }}>{parentCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</ChakraSelect></Box>
+              <Box><FormLabel>Подкатегория</FormLabel><ChakraSelect placeholder={parentCat ? 'Выберите подкатегорию' : 'Сначала выберите группу'} value={formData.category_id} onChange={e => setFormData({ ...formData, category_id: e.target.value })} isDisabled={!parentCat}>{childCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</ChakraSelect></Box>
               <Box><FormLabel>Тип материала</FormLabel><ChakraSelect value={formData.material_type} onChange={e => setFormData({ ...formData, material_type: e.target.value })}><option value="common">Обычный материал</option><option value="equipment_supply">Расходник оборудования</option></ChakraSelect></Box>
               <Box><FormLabel>Единица измерения</FormLabel><ChakraSelect placeholder="Выберите единицу измерения" value={formData.unit_id} onChange={e => setFormData({ ...formData, unit_id: e.target.value })}>{unitTypes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</ChakraSelect></Box>
               <Box><FormLabel>Ссылка на сайт</FormLabel><ChakraInput placeholder="https://..." value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} /></Box>
