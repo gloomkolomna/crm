@@ -69,7 +69,7 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return (
-      <Router>
+      <Router basename="/crm">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="*" element={<Navigate to="/login" />} />
@@ -79,7 +79,7 @@ function AppContent() {
   }
 
   return (
-    <Router>
+    <Router basename="/crm">
       <Flex h="100vh" direction="column">
         <Flex
           as="header"
