@@ -32,7 +32,7 @@ function buildCategoryTree(
       if (node.id !== excludeId) {
         result.push({ id: node.id, label: prefix + node.name });
         if (node.children.length > 0) {
-          walk(node.children, prefix + '→ ');
+          walk(node.children as (Category & { children: Category[] })[], prefix + '→ ');
         }
       }
     }
