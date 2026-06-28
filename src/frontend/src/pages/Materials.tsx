@@ -154,7 +154,7 @@ function Materials() {
         unit_id: Number(formData.unit_id),
         url: formData.url,
         article: formData.article,
-        min_stock: formData.min_stock ? Number(formData.min_stock) : null,
+        min_stock: formData.min_stock ? Number(formData.min_stock) : 1,
         material_type: formData.material_type,
       };
       if (editingMaterial) {

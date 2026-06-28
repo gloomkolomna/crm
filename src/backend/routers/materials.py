@@ -76,7 +76,7 @@ def create_material(data: dict, current_user: User = Depends(get_current_user), 
         url=data.get("url"),
         article=data.get("article"),
         current_stock=0,
-        min_stock=data.get("min_stock"),
+        min_stock=data.get("min_stock") or 1,
         average_cost=0,
         material_type=data.get("material_type", "common")
     )
