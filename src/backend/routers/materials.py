@@ -28,6 +28,7 @@ def read_materials(
     limit: int = 100,
     category_id: Optional[int] = None,
     material_type: Optional[str] = None,
+    search: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -36,6 +37,11 @@ def read_materials(
         query = query.filter(Material.category_id == category_id)
     if material_type:
         query = query.filter(Material.material_type == material_type)
+    if search:
+        query = query.filter(
+            Material.name.ilike(f"%{search}%") |
+            Material.article.ilike(f"%{search}%")
+        )
     materials = query.offset(skip).limit(limit).all()
 
     result = []
