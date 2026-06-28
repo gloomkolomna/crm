@@ -77,8 +77,6 @@ function CategoryRowView({
 }) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
-  const matchesSearch = !searchQuery || node.name.toLowerCase().includes(searchQuery.toLowerCase());
-
   return (
     <>
       <Flex
