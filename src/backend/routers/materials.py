@@ -38,9 +38,10 @@ def read_materials(
     if material_type:
         query = query.filter(Material.material_type == material_type)
     if search:
+        search_lower = search.lower()
         query = query.filter(
-            Material.name.ilike(f"%{search}%") |
-            Material.article.ilike(f"%{search}%")
+            func.lower(Material.name).like(f"%{search_lower}%") |
+            func.lower(Material.article).like(f"%{search_lower}%")
         )
     materials = query.offset(skip).limit(limit).all()
 

@@ -196,7 +196,13 @@ function Categories() {
             <ChakraInput placeholder="Поиск по названию..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} pl={8} pr={8} />
             <Box position="absolute" left={2} top="50%" transform="translateY(-50%)" color="gray.400"><FiSearch /></Box>
             {searchQuery && (
-              <IconButton aria-label="Очистить поиск" icon={<FiX />} size="xs" variant="ghost" position="absolute" right={1} top="50%" transform="translateY(-50%)" onClick={() => setSearchQuery('')} />
+              <Box
+                position="absolute" right={2} top="50%" transform="translateY(-50%)"
+                cursor="pointer" color="gray.400" _hover={{ color: 'gray.600' }}
+                onClick={() => setSearchQuery('')} zIndex={1}
+              >
+                <FiX size={16} />
+              </Box>
             )}
           </Box>
           <Button colorScheme="blue" leftIcon={<FiPlus />} onClick={() => handleOpen()} w={{ base: '100%', md: 'auto' }}>Добавить категорию</Button>
