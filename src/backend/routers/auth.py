@@ -63,7 +63,7 @@ async def vk_callback(
         raise HTTPException(status_code=400, detail="VK user_id not found in response")
 
     if not is_vk_id_allowed(vk_user_id):
-        raise HTTPException(status_code=403, detail="Доступ запрещён")
+        raise HTTPException(status_code=403, detail=f"Доступ запрещён. Ваш VK ID: {vk_user_id}")
 
     first_name = user_info.get("first_name", "")
     last_name = user_info.get("last_name", "")
