@@ -59,6 +59,8 @@ export const getEquipmentConsumption = (equipmentId: number, days: number = 30) 
 export const getProductSpecification = (productId: number) => api.get(`/products/${productId}/specification/`);
 export const addMaterialToSpecification = (productId: number, data: any) => api.post(`/products/${productId}/specification/materials/`, data);
 export const addEquipmentToSpecification = (productId: number, data: any) => api.post(`/products/${productId}/specification/equipment/`, data);
+export const updateMaterialSpec = (productId: number, specId: number, data: any) => api.put(`/products/${productId}/specification/materials/${specId}/`, data);
+export const updateEquipmentSpec = (productId: number, specId: number, data: any) => api.put(`/products/${productId}/specification/equipment/${specId}/`, data);
 export const removeFromSpecification = (productId: number, specType: string, specId: number) => api.delete(`/products/${productId}/specification/${specType}/${specId}/`);
 
 // Sales

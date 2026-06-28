@@ -213,6 +213,58 @@ def add_product_spec_equipment(product_id: int, data: dict, current_user: User =
     }
 
 
+@router.put("/{product_id}/specification/materials/{spec_id}/")
+def update_product_spec_material(product_id: int, spec_id: int, data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    spec = db.query(ProductSpecification).filter(
+        ProductSpecification.id == spec_id,
+        ProductSpecification.product_id == product_id
+    ).first()
+    if not spec:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+
+    if "quantity" in data:
+        spec.quantity = data["quantity"]
+
+    db.commit()
+    db.refresh(spec)
+
+    material = db.query(Material).filter(Material.id == spec.material_id).first()
+    return {
+        "id": spec.id,
+        "type": "material",
+        "material_id": spec.material_id,
+        "name": material.name if material else None,
+        "quantity": spec.quantity,
+        "cost": spec.quantity * material.average_cost if material else 0
+    }
+
+
+@router.put("/{product_id}/specification/equipment/{spec_id}/")
+def update_product_spec_equipment(product_id: int, spec_id: int, data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    spec = db.query(ProductEquipmentSpecification).filter(
+        ProductEquipmentSpecification.id == spec_id,
+        ProductEquipmentSpecification.product_id == product_id
+    ).first()
+    if not spec:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+
+    if "depreciation_per_unit" in data:
+        spec.depreciation_per_unit = data["depreciation_per_unit"]
+
+    db.commit()
+    db.refresh(spec)
+
+    equipment = db.query(Equipment).filter(Equipment.id == spec.equipment_id).first()
+    return {
+        "id": spec.id,
+        "type": "equipment",
+        "equipment_id": spec.equipment_id,
+        "name": equipment.name if equipment else None,
+        "depreciation_per_unit": spec.depreciation_per_unit,
+        "cost": spec.depreciation_per_unit
+    }
+
+
 @router.delete("/{product_id}/specification/{spec_type}/{spec_id}/")
 def remove_product_spec(product_id: int, spec_type: str, spec_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if spec_type == "material":

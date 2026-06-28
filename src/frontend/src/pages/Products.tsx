@@ -9,7 +9,8 @@ import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiList, FiTool, FiPrinter, FiBox 
 import {
   getProducts, createProduct, updateProduct, deleteProduct,
   getMaterials, getEquipment, getProductSpecification,
-  addMaterialToSpecification, addEquipmentToSpecification, removeFromSpecification
+  addMaterialToSpecification, addEquipmentToSpecification,
+  updateMaterialSpec, updateEquipmentSpec, removeFromSpecification
 } from '../api';
 import SortableTable from '../components/SortableTable';
 import type { ColumnConfig } from '../components/SortableTable';
@@ -37,6 +38,8 @@ function Products() {
   const [newMatQty, setNewMatQty] = useState('');
   const [newEqId, setNewEqId] = useState('');
   const [newEqDepreciation, setNewEqDepreciation] = useState('');
+  const [editingSpecItem, setEditingSpecItem] = useState<number | null>(null);
+  const [editSpecValue, setEditSpecValue] = useState('');
 
   const [showViewSpecModal, setShowViewSpecModal] = useState(false);
   const [viewSpecItems, setViewSpecItems] = useState<SpecItem[]>([]);
@@ -109,6 +112,30 @@ function Products() {
       setSpecItems(res.data.items || []); setSpecTotalCost(res.data.total_cost || 0);
       setProductCosts(prev => ({ ...prev, [selectedProduct.id]: res.data.total_cost || 0 }));
     } catch (e) { console.error(e); }
+  };
+
+  const startEditSpecItem = (item: SpecItem) => {
+    setEditingSpecItem(item.id);
+    setEditSpecValue(item.type === 'material' ? String(item.quantity ?? '') : String(item.depreciation_per_unit ?? ''));
+  };
+
+  const saveEditSpecItem = async (item: SpecItem) => {
+    if (!selectedProduct || !editSpecValue) return;
+    try {
+      if (item.type === 'material') {
+        await updateMaterialSpec(selectedProduct.id, item.id, { quantity: Number(editSpecValue) });
+      } else {
+        await updateEquipmentSpec(selectedProduct.id, item.id, { depreciation_per_unit: Number(editSpecValue) });
+      }
+      setEditingSpecItem(null); setEditSpecValue('');
+      const res = await getProductSpecification(selectedProduct.id);
+      setSpecItems(res.data.items || []); setSpecTotalCost(res.data.total_cost || 0);
+      setProductCosts(prev => ({ ...prev, [selectedProduct.id]: res.data.total_cost || 0 }));
+    } catch (e) { console.error(e); }
+  };
+
+  const cancelEditSpecItem = () => {
+    setEditingSpecItem(null); setEditSpecValue('');
   };
 
   const handlePrintSpec = () => {
@@ -224,7 +251,27 @@ function Products() {
                       <Table variant="simple" size="sm">
                         <Thead><Tr><Th>Материал</Th><Th>Кол-во</Th><Th>Ед.</Th><Th>Стоимость</Th><Th></Th></Tr></Thead>
                         <Tbody>{specItems.filter(i => i.type === 'material').map(item => (
-                          <Tr key={`mat-${item.id}`}><Td>{item.name}</Td><Td>{item.quantity}</Td><Td>{item.unit_name || '-'}</Td><Td>{item.cost.toFixed(2)} ₽</Td><Td><IconButton aria-label="Remove" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" onClick={() => handleRemoveItem('material', item.id)} /></Td></Tr>
+                          <Tr key={`mat-${item.id}`}>
+                            <Td>{item.name}</Td>
+                            <Td>{editingSpecItem === item.id ? (
+                              <ChakraInput type="number" size="xs" value={editSpecValue} onChange={e => setEditSpecValue(e.target.value)} min="0" w="80px" />
+                            ) : item.quantity}</Td>
+                            <Td>{item.unit_name || '-'}</Td>
+                            <Td>{item.cost.toFixed(2)} ₽</Td>
+                            <Td>
+                              {editingSpecItem === item.id ? (
+                                <Flex gap={1}>
+                                  <IconButton aria-label="Save" icon={<FiSave />} size="xs" variant="ghost" colorScheme="green" onClick={() => saveEditSpecItem(item)} />
+                                  <IconButton aria-label="Cancel" icon={<FiX />} size="xs" variant="ghost" onClick={cancelEditSpecItem} />
+                                </Flex>
+                              ) : (
+                                <Flex gap={1}>
+                                  <IconButton aria-label="Edit" icon={<FiEdit2 />} size="xs" variant="ghost" colorScheme="blue" onClick={() => startEditSpecItem(item)} />
+                                  <IconButton aria-label="Remove" icon={<FiTrash2 />} size="xs" variant="ghost" colorScheme="red" onClick={() => handleRemoveItem('material', item.id)} />
+                                </Flex>
+                              )}
+                            </Td>
+                          </Tr>
                         ))}</Tbody>
                       </Table>
                     )}
