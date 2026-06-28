@@ -18,6 +18,7 @@ from auth import (
     set_oauth_cookies,
     verify_state,
     get_code_verifier,
+    get_allowed_vk_ids,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from models import User
@@ -62,8 +63,8 @@ async def vk_callback(
     if not vk_user_id:
         raise HTTPException(status_code=400, detail="VK user_id not found in response")
 
-    if not is_vk_id_allowed(vk_user_id):
-        raise HTTPException(status_code=403, detail=f"Доступ запрещён. Ваш VK ID: {vk_user_id}")
+    if not is_vk_id_allowed(int(vk_user_id)):
+        raise HTTPException(status_code=403, detail=f"Доступ запрещён. Ваш VK ID: {vk_user_id}. Разрешены: {get_allowed_vk_ids()}")
 
     first_name = user_info.get("first_name", "")
     last_name = user_info.get("last_name", "")
