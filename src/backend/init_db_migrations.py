@@ -5,8 +5,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from alembic.config import Config
 from alembic import command
 from database import engine, SessionLocal, Base
-from models import UnitType, CustomerType, TaxRate, User
-from auth import get_password_hash
+from models import UnitType, CustomerType, TaxRate
 
 
 def run_migrations():
@@ -18,9 +17,8 @@ def run_migrations():
 
 def seed_data():
     """Заполнить начальными данными"""
-    # Создаём таблицы напрямую если миграции не сработали
     Base.metadata.create_all(bind=engine)
-    
+
     db = SessionLocal()
     try:
         if not db.query(UnitType).first():
@@ -48,11 +46,7 @@ def seed_data():
             db.commit()
             print("DOBAVLENO 2 nalogovye stavki")
 
-        if not db.query(User).filter(User.username == "admin").first():
-            admin = User(username="admin", password_hash=get_password_hash("111"), email="admin@uchet.local")
-            db.add(admin)
-            db.commit()
-            print("SOZDAN admin (login: admin, parol: 111)")
+        print("Polzovateli sozdayutsya avtomaticheski pri pervom vhode cherez VK")
     finally:
         db.close()
 

@@ -1,12 +1,19 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import (
-    authenticate_user,
     create_access_token,
     get_current_user,
-    get_password_hash,
+    get_vk_login_url,
+    exchange_vk_code,
+    get_vk_user_info,
+    is_vk_id_allowed,
+    get_or_create_user,
+    generate_state,
+    set_state_cookie,
+    verify_state,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     Token,
 )
@@ -18,52 +25,51 @@ router = APIRouter(
 )
 
 
-@router.post("/register")
-def register(data: dict, db: Session = Depends(get_db)):
-    username = data.get("username")
-    password = data.get("password")
-    email = data.get("email")
-    if not username or not password:
-        raise HTTPException(status_code=400, detail="username и password обязательны")
-    existing = db.query(User).filter(User.username == username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Пользователь с таким именем уже существует")
-    user = User(
-        username=username,
-        password_hash=get_password_hash(password),
-        email=email,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return {"message": "Пользователь успешно зарегистрирован", "id": user.id}
+@router.get("/vk-login")
+def vk_login(response: Response):
+    state = generate_state()
+    set_state_cookie(response, state)
+    url = get_vk_login_url(state)
+    return {"url": url}
 
 
-@router.post("/login", response_model=Token)
-def login(form_data: dict, db: Session = Depends(get_db)):
-    username = form_data.get("username")
-    password = form_data.get("password")
+@router.get("/vk-callback")
+async def vk_callback(code: str, state: str, request: Request, db: Session = Depends(get_db)):
+    expected_state = verify_state(request)
+    if state != expected_state:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
-    user = authenticate_user(db, username, password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверное имя пользователя или пароль",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    token_data = await exchange_vk_code(code)
+    vk_access_token = token_data["access_token"]
+    vk_user_id = token_data["user_id"]
+
+    if not is_vk_id_allowed(vk_user_id):
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+    user_info = await get_vk_user_info(vk_access_token, vk_user_id)
+    first_name = user_info.get("first_name", "")
+    last_name = user_info.get("last_name", "")
+
+    user = get_or_create_user(db, vk_user_id, first_name, last_name)
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": str(user.vk_id)}, expires_delta=access_token_expires
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    frontend_url = "https://belovolovhome.ru/crm"
+    response = RedirectResponse(url=f"{frontend_url}/login?token={access_token}", status_code=302)
+    response.delete_cookie("vk_oauth_state")
+    return response
 
 
 @router.get("/me")
 def read_users_me(current_user: User = Depends(get_current_user)):
     return {
         "id": current_user.id,
+        "vk_id": current_user.vk_id,
         "username": current_user.username,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
         "email": current_user.email,
     }

@@ -1,35 +1,43 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Box, Button, Text, Input as ChakraInput, VStack, Card, CardBody,
-  CardHeader, Alert, AlertIcon, Checkbox,
+  Box, Button, Text, VStack, Card, CardBody,
+  CardHeader, Alert, AlertIcon, Spinner,
 } from '@chakra-ui/react';
+import { FiLogIn } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
+
+const API_URL = '/crm/api';
 
 function Login() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { setToken, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token) {
+      setToken(token);
+      navigate('/');
+    }
+  }, [searchParams]);
 
   if (isAuthenticated) {
     navigate('/');
     return null;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVkLogin = async () => {
     setError('');
     setLoading(true);
     try {
-      await login(username, password, rememberMe);
-      navigate('/');
+      const response = await axios.get(`${API_URL}/auth/vk-login`);
+      window.location.href = response.data.url;
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Произошла ошибка');
-    } finally {
+      setError(err.response?.data?.detail || 'Ошибка при попытке входа через VK');
       setLoading(false);
     }
   };
@@ -56,41 +64,22 @@ function Login() {
               <Box fontSize="sm" ml={2}>{error}</Box>
             </Alert>
           )}
-          <form onSubmit={handleSubmit}>
-            <VStack spacing={4}>
-              <ChakraInput
-                placeholder="Имя пользователя"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                size="lg"
-                required
-              />
-              <ChakraInput
-                type="password"
-                placeholder="Пароль"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                size="lg"
-                required
-              />
-              <Checkbox
-                isChecked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                alignSelf="flex-start"
-              >
-                Запомнить меня
-              </Checkbox>
-              <Button
-                type="submit"
-                colorScheme="blue"
-                w="100%"
-                size="lg"
-                isLoading={loading}
-              >
-                Войти
-              </Button>
-            </VStack>
-          </form>
+          <VStack spacing={4}>
+            <Button
+              leftIcon={loading ? <Spinner size="sm" /> : <FiLogIn />}
+              colorScheme="blue"
+              w="100%"
+              size="lg"
+              isLoading={loading}
+              loadingText="Перенаправление..."
+              onClick={handleVkLogin}
+              bg="#0077FF"
+              _hover={{ bg: '#0066DD' }}
+              _active={{ bg: '#0055CC' }}
+            >
+              Войти через VK ID
+            </Button>
+          </VStack>
         </CardBody>
       </Card>
     </Box>
