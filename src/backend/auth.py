@@ -58,8 +58,8 @@ def get_vk_login_url(state: str) -> str:
         f"{VK_AUTH_URL}"
         f"?client_id={VK_CLIENT_ID}"
         f"&redirect_uri={VK_REDIRECT_URI}"
+        f"&display=page"
         f"&response_type=code"
-        f"&scope=offline"
         f"&state={state}"
         f"&v={VK_API_VERSION}"
     )
