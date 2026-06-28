@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Button, Text, Input as ChakraInput, Select as ChakraSelect,
   Card, CardBody, Flex, Spinner, Modal, ModalOverlay, ModalContent,
@@ -36,10 +36,18 @@ function Products() {
   const [specTotalCost, setSpecTotalCost] = useState(0);
   const [newMatId, setNewMatId] = useState('');
   const [newMatQty, setNewMatQty] = useState('');
+  const [newMatSearch, setNewMatSearch] = useState('');
+  const [showMatDropdown, setShowMatDropdown] = useState(false);
   const [newEqId, setNewEqId] = useState('');
   const [newEqDepreciation, setNewEqDepreciation] = useState('');
   const [editingSpecItem, setEditingSpecItem] = useState<number | null>(null);
   const [editSpecValue, setEditSpecValue] = useState('');
+
+  const filteredMaterials = useMemo(() => {
+    if (!newMatSearch) return materials;
+    const q = newMatSearch.toLowerCase();
+    return materials.filter(m => m.name.toLowerCase().includes(q));
+  }, [materials, newMatSearch]);
 
   const [showViewSpecModal, setShowViewSpecModal] = useState(false);
   const [viewSpecItems, setViewSpecItems] = useState<SpecItem[]>([]);
@@ -78,7 +86,8 @@ function Products() {
 
   const openEditSpec = async (product: Product) => {
     setSelectedProduct(product); setShowSpecModal(true);
-    setNewMatId(''); setNewMatQty(''); setNewEqId(''); setNewEqDepreciation('');
+    setNewMatId(''); setNewMatQty(''); setNewMatSearch(''); setShowMatDropdown(false);
+    setNewEqId(''); setNewEqDepreciation('');
     try { const res = await getProductSpecification(product.id); setSpecItems(res.data.items || []); setSpecTotalCost(res.data.total_cost || 0); } catch (e) { console.error(e); }
   };
 
@@ -86,7 +95,7 @@ function Products() {
     if (!selectedProduct || !newMatId || !newMatQty) return;
     try {
       await addMaterialToSpecification(selectedProduct.id, { material_id: Number(newMatId), quantity: Number(newMatQty) });
-      setNewMatId(''); setNewMatQty('');
+      setNewMatId(''); setNewMatQty(''); setNewMatSearch(''); setShowMatDropdown(false);
       const res = await getProductSpecification(selectedProduct.id);
       setSpecItems(res.data.items || []); setSpecTotalCost(res.data.total_cost || 0);
       setProductCosts(prev => ({ ...prev, [selectedProduct.id]: res.data.total_cost || 0 }));
@@ -237,10 +246,37 @@ function Products() {
                 <TabPanel>
                   <Box display="flex" flexDirection="column" gap={4}>
                     <Flex gap={2} align="flex-end">
-                      <Box flex={2}><FormLabel>Материал</FormLabel>
-                        <ChakraSelect placeholder="Выберите материал" value={newMatId} onChange={e => setNewMatId(e.target.value)}>
-                          {materials.map(m => <option key={m.id} value={m.id}>{m.name} (остаток: {m.current_stock}, цена: {m.average_cost.toFixed(2)} ₽)</option>)}
-                        </ChakraSelect>
+                      <Box flex={2} position="relative"><FormLabel>Материал</FormLabel>
+                        <ChakraInput
+                          placeholder="Поиск материала..."
+                          value={newMatSearch}
+                          onChange={e => { setNewMatSearch(e.target.value); setNewMatId(''); setShowMatDropdown(true); }}
+                          onFocus={() => setShowMatDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowMatDropdown(false), 200)}
+                        />
+                        {showMatDropdown && (
+                          <Box
+                            position="absolute" left={0} right={0} top="100%" zIndex={10}
+                            bg="white" borderWidth={1} borderColor="gray.200" borderRadius="md"
+                            boxShadow="lg" maxH="200px" overflowY="auto"
+                          >
+                            {filteredMaterials.length > 0 ? filteredMaterials.map(m => (
+                              <Box
+                                key={m.id} px={3} py={2} cursor="pointer" fontSize="sm"
+                                _hover={{ bg: 'blue.50' }}
+                                bg={newMatId === String(m.id) ? 'blue.50' : undefined}
+                                onMouseDown={() => { setNewMatId(String(m.id)); setNewMatSearch(m.name); setShowMatDropdown(false); }}
+                              >
+                                <Text fontWeight="medium">{m.name}</Text>
+                                <Text fontSize="xs" color="gray.500">
+                                  Остаток: {m.current_stock} {m.unit_name} | Цена: {m.average_cost.toFixed(2)} ₽
+                                </Text>
+                              </Box>
+                            )) : (
+                              <Text px={3} py={2} color="gray.400" fontSize="sm">Ничего не найдено</Text>
+                            )}
+                          </Box>
+                        )}
                       </Box>
                       <Box flex={1}><FormLabel>Кол-во</FormLabel>
                         <ChakraInput type="number" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} min="0" />
