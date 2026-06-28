@@ -6,8 +6,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from alembic.config import Config
 from alembic import command
 from database import engine, SessionLocal, Base
-from models import UnitType, CustomerType, TaxRate, User
-from auth import get_password_hash
+from models import UnitType, CustomerType, TaxRate
 
 ALEMBIC_CFG = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
 DB_PATH = os.path.join(os.path.dirname(__file__), "uchet.db")
@@ -48,11 +47,7 @@ def cmd_seed():
             db.commit()
             print("Добавлено 2 налоговые ставки")
 
-        if not db.query(User).filter(User.username == "admin").first():
-            admin = User(username="admin", password_hash=get_password_hash("111"), email="admin@uchet.local")
-            db.add(admin)
-            db.commit()
-            print("Создан admin (login: admin, пароль: 111)")
+        print("Пользователи создаются автоматически при первом входе через VK")
     finally:
         db.close()
 
