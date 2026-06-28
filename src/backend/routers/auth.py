@@ -39,15 +39,22 @@ def vk_login(response: Response):
 
 
 @router.get("/vk-callback")
-async def vk_callback(code: str, state: str, request: Request, db: Session = Depends(get_db)):
+async def vk_callback(
+    code: str,
+    state: str,
+    request: Request,
+    device_id: str = "",
+    db: Session = Depends(get_db),
+):
     expected_state = verify_state(request)
     if state != expected_state:
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
     code_verifier = get_code_verifier(request)
-    device_id = generate_device_id()
+    if not device_id:
+        device_id = generate_device_id()
 
-    token_data = await exchange_vk_code(code, code_verifier, device_id)
+    token_data = await exchange_vk_code(code, code_verifier, device_id, state)
     vk_access_token = token_data["access_token"]
 
     user_info = await get_vk_user_info(vk_access_token)

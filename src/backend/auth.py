@@ -82,7 +82,7 @@ def get_vk_login_url(state: str, code_challenge: str) -> str:
     )
 
 
-async def exchange_vk_code(code: str, code_verifier: str, device_id: str) -> dict:
+async def exchange_vk_code(code: str, code_verifier: str, device_id: str, state: str = "") -> dict:
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             VK_ID_TOKEN_URL,
@@ -93,7 +93,7 @@ async def exchange_vk_code(code: str, code_verifier: str, device_id: str) -> dic
                 "code": code,
                 "redirect_uri": VK_REDIRECT_URI,
                 "device_id": device_id,
-                "state": "",
+                "state": state,
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
