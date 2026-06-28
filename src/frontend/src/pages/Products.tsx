@@ -5,7 +5,7 @@ import {
   ModalHeader, ModalBody, ModalCloseButton, IconButton, Badge, useDisclosure, FormLabel, Tabs, TabList, TabPanels, Tab, TabPanel,
   Table, Thead, Tbody, Tr, Th, Td
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiList, FiTool, FiPrinter, FiBox } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiList, FiTool, FiPrinter, FiBox, FiSave, FiX } from 'react-icons/fi';
 import {
   getProducts, createProduct, updateProduct, deleteProduct,
   getMaterials, getEquipment, getProductSpecification,
@@ -294,7 +294,25 @@ function Products() {
                       <Table variant="simple" size="sm">
                         <Thead><Tr><Th>Оборудование</Th><Th>Амортизация</Th><Th></Th></Tr></Thead>
                         <Tbody>{specItems.filter(i => i.type === 'equipment').map(item => (
-                          <Tr key={`eq-${item.id}`}><Td>{item.name}</Td><Td>{item.cost.toFixed(2)} ₽</Td><Td><IconButton aria-label="Remove" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" onClick={() => handleRemoveItem('equipment', item.id)} /></Td></Tr>
+                          <Tr key={`eq-${item.id}`}>
+                            <Td>{item.name}</Td>
+                            <Td>{editingSpecItem === item.id ? (
+                              <ChakraInput type="number" size="xs" value={editSpecValue} onChange={e => setEditSpecValue(e.target.value)} min="0" w="100px" />
+                            ) : `${item.cost.toFixed(2)} ₽`}</Td>
+                            <Td>
+                              {editingSpecItem === item.id ? (
+                                <Flex gap={1}>
+                                  <IconButton aria-label="Save" icon={<FiSave />} size="xs" variant="ghost" colorScheme="green" onClick={() => saveEditSpecItem(item)} />
+                                  <IconButton aria-label="Cancel" icon={<FiX />} size="xs" variant="ghost" onClick={cancelEditSpecItem} />
+                                </Flex>
+                              ) : (
+                                <Flex gap={1}>
+                                  <IconButton aria-label="Edit" icon={<FiEdit2 />} size="xs" variant="ghost" colorScheme="blue" onClick={() => startEditSpecItem(item)} />
+                                  <IconButton aria-label="Remove" icon={<FiTrash2 />} size="xs" variant="ghost" colorScheme="red" onClick={() => handleRemoveItem('equipment', item.id)} />
+                                </Flex>
+                              )}
+                            </Td>
+                          </Tr>
                         ))}</Tbody>
                       </Table>
                     )}
