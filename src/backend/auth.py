@@ -1,4 +1,6 @@
 import secrets
+import hashlib
+import base64
 from urllib.parse import quote
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -12,18 +14,19 @@ from database import get_db
 from models import User
 from config import (
     SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES,
-    VK_CLIENT_ID, VK_CLIENT_SECRET, VK_REDIRECT_URI, VK_API_VERSION,
+    VK_CLIENT_ID, VK_CLIENT_SECRET, VK_REDIRECT_URI,
     get_allowed_vk_ids,
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-VK_AUTH_URL = "https://oauth.vk.com/authorize"
-VK_TOKEN_URL = "https://oauth.vk.com/access_token"
-VK_API_URL = "https://api.vk.com/method"
+VK_ID_AUTH_URL = "https://id.vk.com/authorize"
+VK_ID_TOKEN_URL = "https://id.vk.com/oauth2/auth"
+VK_ID_USER_INFO_URL = "https://id.vk.com/oauth2/user_info"
 
 STATE_COOKIE = "vk_oauth_state"
-STATE_TTL = 600
+CODE_VERIFIER_COOKIE = "vk_code_verifier"
+COOKIE_TTL = 600
 
 
 class Token(BaseModel):
@@ -54,27 +57,45 @@ def generate_state() -> str:
     return secrets.token_urlsafe(32)
 
 
-def get_vk_login_url(state: str) -> str:
+def generate_code_verifier() -> str:
+    return secrets.token_urlsafe(64)
+
+
+def compute_code_challenge(code_verifier: str) -> str:
+    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def generate_device_id() -> str:
+    return secrets.token_hex(16)
+
+
+def get_vk_login_url(state: str, code_challenge: str) -> str:
     return (
-        f"{VK_AUTH_URL}"
-        f"?client_id={VK_CLIENT_ID}"
+        f"{VK_ID_AUTH_URL}"
+        f"?response_type=code"
+        f"&client_id={VK_CLIENT_ID}"
         f"&redirect_uri={quote(VK_REDIRECT_URI, safe='')}"
-        f"&display=page"
-        f"&response_type=code"
         f"&state={state}"
+        f"&code_challenge={code_challenge}"
+        f"&code_challenge_method=S256"
     )
 
 
-async def exchange_vk_code(code: str) -> dict:
+async def exchange_vk_code(code: str, code_verifier: str, device_id: str) -> dict:
     async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            VK_TOKEN_URL,
-            params={
+        resp = await client.post(
+            VK_ID_TOKEN_URL,
+            data={
+                "grant_type": "authorization_code",
                 "client_id": VK_CLIENT_ID,
-                "client_secret": VK_CLIENT_SECRET,
-                "redirect_uri": VK_REDIRECT_URI,
+                "code_verifier": code_verifier,
                 "code": code,
+                "redirect_uri": VK_REDIRECT_URI,
+                "device_id": device_id,
+                "state": "",
             },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         data = resp.json()
         if "error" in data:
@@ -82,23 +103,22 @@ async def exchange_vk_code(code: str) -> dict:
         return data
 
 
-async def get_vk_user_info(access_token: str, user_id: int) -> dict:
+async def get_vk_user_info(access_token: str) -> dict:
     async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{VK_API_URL}/users.get",
-            params={
-                "user_ids": str(user_id),
+        resp = await client.post(
+            VK_ID_USER_INFO_URL,
+            data={
+                "client_id": VK_CLIENT_ID,
                 "access_token": access_token,
-                "v": VK_API_VERSION,
+            },
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
             },
         )
         data = resp.json()
         if "error" in data:
-            raise HTTPException(status_code=400, detail=f"VK API error: {data['error'].get('error_msg', 'unknown')}")
-        users = data.get("response", [])
-        if not users:
-            raise HTTPException(status_code=400, detail="VK user not found")
-        return users[0]
+            raise HTTPException(status_code=400, detail=f"VK API error: {data.get('error_description', data['error'])}")
+        return data.get("user", data)
 
 
 def is_vk_id_allowed(vk_id: int) -> bool:
@@ -127,15 +147,16 @@ def get_or_create_user(db: Session, vk_id: int, first_name: str, last_name: str)
     return user
 
 
-def set_state_cookie(response: Response, state: str):
-    response.set_cookie(
-        key=STATE_COOKIE,
-        value=state,
-        max_age=STATE_TTL,
-        httponly=True,
-        samesite="lax",
-        secure=True,
-    )
+def set_oauth_cookies(response: Response, state: str, code_verifier: str):
+    for key, value in [(STATE_COOKIE, state), (CODE_VERIFIER_COOKIE, code_verifier)]:
+        response.set_cookie(
+            key=key,
+            value=value,
+            max_age=COOKIE_TTL,
+            httponly=True,
+            samesite="lax",
+            secure=True,
+        )
 
 
 def verify_state(request: Request) -> str:
@@ -143,6 +164,13 @@ def verify_state(request: Request) -> str:
     if not state:
         raise HTTPException(status_code=400, detail="OAuth state cookie not found")
     return state
+
+
+def get_code_verifier(request: Request) -> str:
+    verifier = request.cookies.get(CODE_VERIFIER_COOKIE)
+    if not verifier:
+        raise HTTPException(status_code=400, detail="OAuth code verifier cookie not found")
+    return verifier
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
