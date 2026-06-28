@@ -252,3 +252,26 @@ def update_material_batch(material_id: int, batch_id: int, data: dict, current_u
         "cost_per_unit": batch.total_cost / batch.quantity if batch.quantity > 0 else 0,
         "purchase_date": str(batch.purchase_date)
     }
+
+
+@router.delete("/{material_id}/batches/{batch_id}")
+def delete_material_batch(material_id: int, batch_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if material is None:
+        raise HTTPException(status_code=404, detail="Материал не найден")
+
+    batch = db.query(MaterialBatch).filter(MaterialBatch.id == batch_id, MaterialBatch.material_id == material_id).first()
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Закупка не найдена")
+
+    material.current_stock -= batch.quantity
+
+    db.delete(batch)
+
+    remaining = db.query(MaterialBatch).filter(MaterialBatch.material_id == material_id).all()
+    total_quantity = sum(b.quantity for b in remaining)
+    total_cost_sum = sum(b.total_cost for b in remaining)
+    material.average_cost = total_cost_sum / total_quantity if total_quantity > 0 else 0
+
+    db.commit()
+    return {"message": "Закупка удалена"}

@@ -8,7 +8,7 @@ import {
 import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiExternalLink, FiSearch, FiX, FiLayers, FiSave } from 'react-icons/fi';
 import {
   getMaterials, createMaterial, updateMaterial, deleteMaterial, getUnitTypes,
-  getMaterialBatches, addMaterialBatch, updateMaterialBatch
+  getMaterialBatches, addMaterialBatch, updateMaterialBatch, deleteMaterialBatch
 } from '../api';
 import { getCategories } from '../api';
 import SortableTable from '../components/SortableTable';
@@ -209,6 +209,18 @@ function Materials() {
     setBatchDate(new Date().toISOString().split('T')[0]);
   };
 
+  const handleDeleteBatch = async (batchId: number) => {
+    if (!batchMaterialId || !confirm('Удалить закупку?')) return;
+    try {
+      await deleteMaterialBatch(batchMaterialId, batchId);
+      setBatches((await getMaterialBatches(batchMaterialId)).data);
+      fetchData();
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || 'Ошибка при удалении закупки';
+      toast({ title: 'Ошибка', description: msg, status: 'error', duration: 5000, isClosable: true });
+    }
+  };
+
   const handleAddBatch = async () => {
     if (!batchMaterialId || !batchQuantity || !batchTotalCost) return;
     try {
@@ -360,6 +372,7 @@ function Materials() {
                         <Td>{b.cost_per_unit.toFixed(2)} ₽</Td>
                         <Td>
                           <IconButton aria-label="Edit batch" icon={<FiEdit2 />} size="xs" variant="ghost" colorScheme="blue" onClick={() => editBatch(b)} title="Редактировать" />
+                          <IconButton aria-label="Delete batch" icon={<FiTrash2 />} size="xs" variant="ghost" colorScheme="red" onClick={() => handleDeleteBatch(b.id)} title="Удалить" />
                         </Td>
                       </Tr>
                     ))}</Tbody>

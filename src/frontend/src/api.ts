@@ -28,6 +28,7 @@ export const getUnitTypes = () => api.get('/materials/units/');
 export const getMaterialBatches = (materialId: number) => api.get(`/materials/${materialId}/batches/`);
 export const addMaterialBatch = (materialId: number, data: any) => api.post(`/materials/${materialId}/batches/`, data);
 export const updateMaterialBatch = (materialId: number, batchId: number, data: any) => api.put(`/materials/${materialId}/batches/${batchId}`, data);
+export const deleteMaterialBatch = (materialId: number, batchId: number) => api.delete(`/materials/${materialId}/batches/${batchId}`);
 
 // Products
 export const getProducts = () => api.get('/products/');
