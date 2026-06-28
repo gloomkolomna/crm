@@ -3,12 +3,12 @@ import {
   Box, Button, Text, Input as ChakraInput, Select as ChakraSelect,
   Card, CardBody, Flex, Spinner, Modal, ModalOverlay, ModalContent,
   ModalHeader, ModalBody, ModalCloseButton, IconButton, Badge, useDisclosure, FormLabel,
-  Table, Thead, Tbody, Tr, Th, Td
+  Table, Thead, Tbody, Tr, Th, Td, useToast
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiExternalLink, FiSearch, FiX, FiLayers } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiPackage, FiExternalLink, FiSearch, FiX, FiLayers, FiSave } from 'react-icons/fi';
 import {
   getMaterials, createMaterial, updateMaterial, deleteMaterial, getUnitTypes,
-  getMaterialBatches, addMaterialBatch
+  getMaterialBatches, addMaterialBatch, updateMaterialBatch
 } from '../api';
 import { getCategories } from '../api';
 import SortableTable from '../components/SortableTable';
@@ -40,6 +40,7 @@ interface Batch {
 }
 
 function Materials() {
+  const toast = useToast();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
@@ -82,6 +83,7 @@ function Materials() {
   const [batchTotalCost, setBatchTotalCost] = useState('');
   const [batchDate, setBatchDate] = useState(new Date().toISOString().split('T')[0]);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
 
   useEffect(() => { fetchData(); }, []);
   useEffect(() => { fetchCategories(); fetchUnitTypes(); }, []);
@@ -173,24 +175,57 @@ function Materials() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('Удалить?')) { await deleteMaterial(id); fetchData(); }
+    if (!confirm('Удалить?')) return;
+    try {
+      await deleteMaterial(id);
+      fetchData();
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || 'Ошибка при удалении материала';
+      toast({ title: 'Ошибка', description: msg, status: 'error', duration: 5000, isClosable: true });
+    }
   };
 
   const openBatchModal = async (materialId: number, materialName: string) => {
     setBatchMaterialId(materialId); setBatchMaterialName(materialName);
     setBatchQuantity(''); setBatchTotalCost('');
     setBatchDate(new Date().toISOString().split('T')[0]);
+    setEditingBatch(null);
     setShowBatchModal(true);
     try { setBatches((await getMaterialBatches(materialId)).data); }
     catch (e) { console.error(e); }
   };
 
+  const editBatch = (batch: Batch) => {
+    setEditingBatch(batch);
+    setBatchQuantity(String(batch.quantity));
+    setBatchTotalCost(String(batch.total_cost));
+    setBatchDate(batch.purchase_date);
+  };
+
+  const cancelEditBatch = () => {
+    setEditingBatch(null);
+    setBatchQuantity('');
+    setBatchTotalCost('');
+    setBatchDate(new Date().toISOString().split('T')[0]);
+  };
+
   const handleAddBatch = async () => {
     if (!batchMaterialId || !batchQuantity || !batchTotalCost) return;
     try {
-      await addMaterialBatch(batchMaterialId, { quantity: Number(batchQuantity), total_cost: Number(batchTotalCost), purchase_date: batchDate });
-      setShowBatchModal(false); fetchData();
-    } catch (e) { console.error(e); }
+      if (editingBatch) {
+        await updateMaterialBatch(batchMaterialId, editingBatch.id, {
+          quantity: Number(batchQuantity), total_cost: Number(batchTotalCost), purchase_date: batchDate
+        });
+      } else {
+        await addMaterialBatch(batchMaterialId, {
+          quantity: Number(batchQuantity), total_cost: Number(batchTotalCost), purchase_date: batchDate
+        });
+      }
+      setShowBatchModal(false); cancelEditBatch(); fetchData();
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || 'Ошибка при сохранении закупки';
+      toast({ title: 'Ошибка', description: msg, status: 'error', duration: 5000, isClosable: true });
+    }
   };
 
   const batchCostPerUnit = batchQuantity && batchTotalCost ? (Number(batchTotalCost) / Number(batchQuantity)).toFixed(2) : '0';
@@ -295,9 +330,9 @@ function Materials() {
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={showBatchModal} onClose={() => setShowBatchModal(false)} size="lg">
+      <Modal isOpen={showBatchModal} onClose={() => { setShowBatchModal(false); cancelEditBatch(); }} size="lg">
         <ModalOverlay /><ModalContent>
-          <ModalHeader>Закупка: {batchMaterialName}</ModalHeader><ModalCloseButton />
+          <ModalHeader>Закупка: {batchMaterialName} {editingBatch ? '(редактирование)' : ''}</ModalHeader><ModalCloseButton />
           <ModalBody pb={6}>
             <Box display="flex" flexDirection="column" gap={4}>
               <Flex gap={4}>
@@ -306,13 +341,28 @@ function Materials() {
               </Flex>
               <Box><FormLabel>Общая стоимость (₽)</FormLabel><ChakraInput type="number" placeholder="Например: 500" value={batchTotalCost} onChange={e => setBatchTotalCost(e.target.value)} min="0" /></Box>
               {batchQuantity && batchTotalCost && <Box bg="blue.50" p={3} borderRadius="md"><Text fontWeight="bold">Цена за единицу: {batchCostPerUnit} ₽</Text></Box>}
-              <Button colorScheme="green" onClick={handleAddBatch} isDisabled={!batchQuantity || !batchTotalCost}>Добавить закупку</Button>
+              <Flex gap={2}>
+                <Button colorScheme="green" onClick={handleAddBatch} isDisabled={!batchQuantity || !batchTotalCost} leftIcon={editingBatch ? <FiSave /> : <FiPlus />}>
+                  {editingBatch ? 'Сохранить' : 'Добавить закупку'}
+                </Button>
+                {editingBatch && <Button variant="outline" onClick={cancelEditBatch}>Отмена</Button>}
+              </Flex>
               {batches.length > 0 && (
                 <Box borderTop="1px solid" borderColor="gray.200" pt={4}>
                   <Text fontWeight="bold" mb={3}>История закупок</Text>
                   <Table variant="simple" size="sm">
-                    <Thead><Tr><Th>Дата</Th><Th>Кол-во</Th><Th>Общая стоимость</Th><Th>Цена за ед.</Th></Tr></Thead>
-                    <Tbody>{batches.map(b => (<Tr key={b.id}><Td>{b.purchase_date}</Td><Td>{b.quantity}</Td><Td>{b.total_cost.toFixed(2)} ₽</Td><Td>{b.cost_per_unit.toFixed(2)} ₽</Td></Tr>))}</Tbody>
+                    <Thead><Tr><Th>Дата</Th><Th>Кол-во</Th><Th>Общая стоимость</Th><Th>Цена за ед.</Th><Th></Th></Tr></Thead>
+                    <Tbody>{batches.map(b => (
+                      <Tr key={b.id} bg={editingBatch?.id === b.id ? 'blue.50' : undefined}>
+                        <Td>{b.purchase_date}</Td>
+                        <Td>{b.quantity}</Td>
+                        <Td>{b.total_cost.toFixed(2)} ₽</Td>
+                        <Td>{b.cost_per_unit.toFixed(2)} ₽</Td>
+                        <Td>
+                          <IconButton aria-label="Edit batch" icon={<FiEdit2 />} size="xs" variant="ghost" colorScheme="blue" onClick={() => editBatch(b)} title="Редактировать" />
+                        </Td>
+                      </Tr>
+                    ))}</Tbody>
                   </Table>
                 </Box>
               )}

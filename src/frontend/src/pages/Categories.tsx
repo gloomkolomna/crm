@@ -2,18 +2,35 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Button, Text, Input as ChakraInput, Select as ChakraSelect,
   Card, CardBody, Flex, Spinner, Modal, ModalOverlay, ModalContent,
-  ModalHeader, ModalBody, ModalCloseButton, IconButton, useDisclosure, FormLabel
+  ModalHeader, ModalBody, ModalCloseButton, IconButton, useDisclosure, FormLabel,
+  VStack, HStack, Badge
 } from '@chakra-ui/react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiFolder } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiFolder, FiChevronRight, FiChevronDown } from 'react-icons/fi';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../api';
-import SortableTable from '../components/SortableTable';
-import type { ColumnConfig } from '../components/SortableTable';
 
 interface Category { id: number; name: string; parent_id: number | null; }
 
-interface CategoryRow extends Category {
-  depth: number;
-  parent_name: string;
+interface CategoryNode extends Category {
+  children: CategoryNode[];
+}
+
+function buildTree(categories: Category[]): CategoryNode[] {
+  const map = new Map<number, CategoryNode>();
+  const roots: CategoryNode[] = [];
+
+  for (const cat of categories) {
+    map.set(cat.id, { ...cat, children: [] });
+  }
+  for (const cat of categories) {
+    const node = map.get(cat.id)!;
+    if (cat.parent_id && map.has(cat.parent_id)) {
+      map.get(cat.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  return roots;
 }
 
 function buildCategoryTree(
@@ -49,30 +66,74 @@ function buildCategoryTree(
   return result;
 }
 
-function buildFlatWithDepth(categories: Category[]): CategoryRow[] {
-  const map = new Map<number, Category>();
-  for (const cat of categories) {
-    map.set(cat.id, cat);
-  }
+function CategoryRowView({
+  node, level, searchQuery, onEdit, onDelete
+}: {
+  node: CategoryNode;
+  level: number;
+  searchQuery: string;
+  onEdit: (cat: Category) => void;
+  onDelete: (id: number) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = node.children.length > 0;
+  const matchesSearch = !searchQuery || node.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-  function getDepth(id: number): number {
-    let depth = 0;
-    let current = map.get(id);
-    const visited = new Set<number>();
-    while (current?.parent_id) {
-      if (visited.has(current.parent_id)) break;
-      visited.add(current.parent_id);
-      depth++;
-      current = map.get(current.parent_id);
-    }
-    return depth;
-  }
-
-  return categories.map(cat => ({
-    ...cat,
-    depth: getDepth(cat.id),
-    parent_name: cat.parent_id ? map.get(cat.parent_id)?.name || '-' : '-',
-  }));
+  return (
+    <>
+      <Flex
+        align="center"
+        pl={level * 6}
+        py={2.5}
+        px={4}
+        borderBottom="1px solid"
+        borderColor="gray.100"
+        _hover={{ bg: 'gray.50' }}
+        role="group"
+      >
+        <Box w="30px" textAlign="center">
+          {hasChildren ? (
+            <IconButton
+              aria-label={expanded ? 'Свернуть' : 'Развернуть'}
+              icon={expanded ? <FiChevronDown /> : <FiChevronRight />}
+              size="xs"
+              variant="ghost"
+              onClick={() => setExpanded(!expanded)}
+            />
+          ) : (
+            <FiFolder size={16} style={{ opacity: 0.5 }} />
+          )}
+        </Box>
+        <HStack flex={1} spacing={2}>
+          {level > 0 && <Text color="gray.400" fontSize="sm">→</Text>}
+          <Text fontWeight={level === 0 ? 'semibold' : 'normal'}>{node.name}</Text>
+          {hasChildren && (
+            <Badge colorScheme="gray" fontSize="xs" variant="subtle">
+              {node.children.length}
+            </Badge>
+          )}
+        </HStack>
+        <HStack opacity={0} _groupHover={{ opacity: 1 }} transition="opacity 0.15s">
+          <IconButton aria-label="Edit" icon={<FiEdit2 />} size="sm" variant="ghost" onClick={() => onEdit(node)} title="Редактировать" />
+          <IconButton aria-label="Delete" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" onClick={() => onDelete(node.id)} title="Удалить" />
+        </HStack>
+      </Flex>
+      {hasChildren && expanded && (
+        <>
+          {node.children.map(child => (
+            <CategoryRowView
+              key={child.id}
+              node={child}
+              level={level + 1}
+              searchQuery={searchQuery}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+        </>
+      )}
+    </>
+  );
 }
 
 function Categories() {
@@ -91,17 +152,7 @@ function Categories() {
     finally { setLoading(false); }
   };
 
-  const displayData = useMemo(() => {
-    let rows = buildFlatWithDepth(categories);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      rows = rows.filter(r =>
-        r.name.toLowerCase().includes(q) ||
-        r.parent_name.toLowerCase().includes(q)
-      );
-    }
-    return rows;
-  }, [categories, searchQuery]);
+  const tree = useMemo(() => buildTree(categories), [categories]);
 
   const handleOpen = (category?: Category) => {
     if (category) {
@@ -136,29 +187,6 @@ function Categories() {
     if (confirm('Удалить категорию?')) { await deleteCategory(id); fetchCategories(); }
   };
 
-  const columns: ColumnConfig[] = [
-    { key: '_icon', label: '', width: '30px', sortable: false, filterable: false, render: () => <FiFolder size={16} /> },
-    {
-      key: 'name', label: 'Название', filterType: 'text',
-      render: (val: string, row: CategoryRow) => (
-        <Text pl={row.depth * 4} as="span">
-          {row.depth > 0 ? <Text as="span" color="gray.400">→ </Text> : null}
-          {val}
-        </Text>
-      )
-    },
-    { key: 'parent_name', label: 'Родитель', filterType: 'select' },
-    {
-      key: '_actions', label: 'Действия', sortable: false, filterable: false,
-      render: (_: any, row: CategoryRow) => (
-        <Flex gap={1}>
-          <IconButton aria-label="Edit" icon={<FiEdit2 />} size="sm" variant="ghost" onClick={() => handleOpen(row)} title="Редактировать" />
-          <IconButton aria-label="Delete" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" onClick={() => handleDelete(row.id)} title="Удалить" />
-        </Flex>
-      )
-    },
-  ];
-
   if (loading) return <Spinner size="xl" />;
 
   return (
@@ -176,8 +204,23 @@ function Categories() {
           <Button colorScheme="blue" leftIcon={<FiPlus />} onClick={() => handleOpen()} w={{ base: '100%', md: 'auto' }}>Добавить категорию</Button>
         </Flex>
       </Flex>
-      <Card><CardBody overflowX="auto">
-        <SortableTable columns={columns} data={displayData} size="md" />
+      <Card><CardBody overflowX="auto" p={0}>
+        <VStack spacing={0} align="stretch">
+          {tree.length === 0 ? (
+            <Text color="gray.500" textAlign="center" py={8}>Нет категорий</Text>
+          ) : (
+            tree.map(node => (
+              <CategoryRowView
+                key={node.id}
+                node={node}
+                level={0}
+                searchQuery={searchQuery}
+                onEdit={handleOpen}
+                onDelete={handleDelete}
+              />
+            ))
+          )}
+        </VStack>
       </CardBody></Card>
 
       <Modal isOpen={isOpen} onClose={handleClose}>

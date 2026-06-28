@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 from datetime import datetime
 from models import Material, Category, UnitType, MaterialBatch
@@ -134,8 +135,15 @@ def delete_material(material_id: int, current_user: User = Depends(get_current_u
     material = db.query(Material).filter(Material.id == material_id).first()
     if material is None:
         raise HTTPException(status_code=404, detail="Материал не найден")
-    db.delete(material)
-    db.commit()
+    try:
+        db.delete(material)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Невозможно удалить материал: он используется в спецификациях продукции, оборудования, браке или других записях. Сначала удалите все ссылки на этот материал."
+        )
     return {"message": "Материал удалён"}
 
 
@@ -198,5 +206,49 @@ def add_material_batch(material_id: int, data: dict, current_user: User = Depend
         "quantity": batch.quantity,
         "total_cost": batch.total_cost,
         "cost_per_unit": total_cost / quantity,
+        "purchase_date": str(batch.purchase_date)
+    }
+
+
+@router.put("/{material_id}/batches/{batch_id}")
+def update_material_batch(material_id: int, batch_id: int, data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if material is None:
+        raise HTTPException(status_code=404, detail="Материал не найден")
+
+    batch = db.query(MaterialBatch).filter(MaterialBatch.id == batch_id, MaterialBatch.material_id == material_id).first()
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Закупка не найдена")
+
+    old_quantity = batch.quantity
+    old_total_cost = batch.total_cost
+
+    new_quantity = data.get("quantity", batch.quantity)
+    new_total_cost = data.get("total_cost", batch.total_cost)
+    new_purchase_date_str = data.get("purchase_date")
+
+    if new_quantity <= 0:
+        raise HTTPException(status_code=400, detail="Количество должно быть больше 0")
+
+    batch.quantity = new_quantity
+    batch.total_cost = new_total_cost
+    if new_purchase_date_str:
+        batch.purchase_date = datetime.strptime(new_purchase_date_str, "%Y-%m-%d").date()
+
+    material.current_stock += new_quantity - old_quantity
+
+    all_batches = db.query(MaterialBatch).filter(MaterialBatch.material_id == material_id).all()
+    total_quantity = sum(b.quantity for b in all_batches)
+    total_cost_sum = sum(b.total_cost for b in all_batches)
+    material.average_cost = total_cost_sum / total_quantity if total_quantity > 0 else 0
+
+    db.commit()
+    db.refresh(batch)
+
+    return {
+        "id": batch.id,
+        "quantity": batch.quantity,
+        "total_cost": batch.total_cost,
+        "cost_per_unit": batch.total_cost / batch.quantity if batch.quantity > 0 else 0,
         "purchase_date": str(batch.purchase_date)
     }
