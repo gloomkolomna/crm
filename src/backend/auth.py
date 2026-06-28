@@ -61,7 +61,6 @@ def get_vk_login_url(state: str) -> str:
         f"&display=page"
         f"&response_type=code"
         f"&state={state}"
-        f"&v={VK_API_VERSION}"
     )
 
 
