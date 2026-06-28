@@ -1,4 +1,5 @@
 import secrets
+from urllib.parse import quote
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
@@ -57,7 +58,7 @@ def get_vk_login_url(state: str) -> str:
     return (
         f"{VK_AUTH_URL}"
         f"?client_id={VK_CLIENT_ID}"
-        f"&redirect_uri={VK_REDIRECT_URI}"
+        f"&redirect_uri={quote(VK_REDIRECT_URI, safe='')}"
         f"&display=page"
         f"&response_type=code"
         f"&state={state}"
