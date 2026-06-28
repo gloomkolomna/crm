@@ -71,7 +71,8 @@ function Materials() {
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [formData, setFormData] = useState({
-    name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common'
+    name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common',
+    initial_quantity: '', initial_total_cost: '', initial_date: new Date().toISOString().split('T')[0]
   });
 
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -115,7 +116,8 @@ function Materials() {
         name: material.name, category_id: String(material.category_id || ''),
         unit_id: String(material.unit_id), url: material.url || '',
         article: material.article || '', min_stock: String(material.min_stock || ''),
-        material_type: material.material_type || 'common'
+        material_type: material.material_type || 'common',
+        initial_quantity: '', initial_total_cost: '', initial_date: new Date().toISOString().split('T')[0]
       });
       const path: number[] = [];
       if (material.category_id) {
@@ -133,7 +135,7 @@ function Materials() {
       setCatPath(path);
     } else {
       setEditingMaterial(null);
-      setFormData({ name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common' });
+      setFormData({ name: '', category_id: '', unit_id: '', url: '', article: '', min_stock: '', material_type: 'common', initial_quantity: '', initial_total_cost: '', initial_date: new Date().toISOString().split('T')[0] });
       setCatPath([]);
     }
     onOpen();
@@ -145,14 +147,27 @@ function Materials() {
     try {
       const catId = catPath.length > 0 ? catPath[catPath.length - 1] : null;
       const data = {
-        ...formData,
+        name: formData.name,
         category_id: catId,
         unit_id: Number(formData.unit_id),
+        url: formData.url,
+        article: formData.article,
         min_stock: formData.min_stock ? Number(formData.min_stock) : null,
         material_type: formData.material_type,
       };
-      if (editingMaterial) await updateMaterial(editingMaterial.id, data);
-      else await createMaterial(data);
+      if (editingMaterial) {
+        await updateMaterial(editingMaterial.id, data);
+      } else {
+        const res = await createMaterial(data);
+        const newId = res.data.id;
+        if (formData.initial_quantity && formData.initial_total_cost) {
+          await addMaterialBatch(newId, {
+            quantity: Number(formData.initial_quantity),
+            total_cost: Number(formData.initial_total_cost),
+            purchase_date: formData.initial_date
+          });
+        }
+      }
       fetchData(); handleClose();
     } catch (e) { console.error(e); }
   };
@@ -265,6 +280,15 @@ function Materials() {
               <Box><FormLabel>Ссылка на сайт</FormLabel><ChakraInput placeholder="https://..." value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} /></Box>
               <Box><FormLabel>Артикул</FormLabel><ChakraInput placeholder="Артикул товара" value={formData.article} onChange={e => setFormData({ ...formData, article: e.target.value })} /></Box>
               <Box><FormLabel>Минимальный остаток</FormLabel><ChakraInput placeholder="Введите мин. остаток" value={formData.min_stock} onChange={e => setFormData({ ...formData, min_stock: e.target.value })} /></Box>
+              {!editingMaterial && (
+                <>
+                  <Flex gap={4}>
+                    <Box flex={1}><FormLabel>Начальное количество</FormLabel><ChakraInput type="number" placeholder="Например: 100" value={formData.initial_quantity} onChange={e => setFormData({ ...formData, initial_quantity: e.target.value })} min="0" /></Box>
+                    <Box flex={1}><FormLabel>Дата закупки</FormLabel><ChakraInput type="date" value={formData.initial_date} onChange={e => setFormData({ ...formData, initial_date: e.target.value })} /></Box>
+                  </Flex>
+                  <Box><FormLabel>Общая стоимость (₽)</FormLabel><ChakraInput type="number" placeholder="Например: 5000" value={formData.initial_total_cost} onChange={e => setFormData({ ...formData, initial_total_cost: e.target.value })} min="0" /></Box>
+                </>
+              )}
               <Button colorScheme="blue" onClick={handleSubmit}>Сохранить</Button>
             </Box>
           </ModalBody>
