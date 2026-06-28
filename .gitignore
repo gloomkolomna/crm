@@ -28,3 +28,4 @@ Thumbs.db
 graphify-out/
 
 src/backend/.env
+deploy.sh
